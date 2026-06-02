@@ -25,6 +25,10 @@ from serial.tools import list_ports, list_ports_common
 
 UART_HEADER = 0xAA
 UART_PROTOCOL_VERSION = 0x02
+UART_PROTOCOL_MULTI = 0x03
+UART_PROTOCOL_CONTROL = 0x04
+UART_CONTROL_ANNOUNCE = 0x01
+UART_CONTROL_SET_COLOR = 0x02
 RUMBLE_HEADER = 0xBB
 RUMBLE_TYPE_RUMBLE = 0x01
 UART_BAUD = 921600
@@ -278,6 +282,13 @@ class SwitchReport:
         frame = bytes([UART_HEADER, UART_PROTOCOL_VERSION, payload_len]) + payload
         return frame + bytes([compute_checksum(frame)])
 
+    def to_multi_bytes(self, controller_id: int) -> bytes:
+        """Serialize as UART v3: 0xAA, 0x03, controller_id, payload_len, payload, checksum."""
+        base = self.to_bytes()
+        payload_len = base[2]
+        payload = base[3 : 3 + payload_len]
+        frame = bytes([UART_HEADER, UART_PROTOCOL_MULTI, int(controller_id) & 0xFF, payload_len]) + payload
+        return frame + bytes([compute_checksum(frame)])
 
 class PicoUART:
     def __init__(self, port: str, baudrate: int = UART_BAUD) -> None:
@@ -296,9 +307,34 @@ class PicoUART:
         )
         self._buffer = bytearray()
 
-    def send_report(self, report: SwitchReport) -> None:
-        """Send a controller report to the Pico."""
-        self.serial.write(report.to_bytes())
+    def send_report(self, report: SwitchReport, controller_id: Optional[int] = None) -> None:
+        """Send a controller report to the Pico.
+
+        controller_id=None preserves the original v2 packet and controls slot 0.
+        controller_id=0..7 uses UART v3 explicit slot routing.
+        """
+        if controller_id is None:
+            self.serial.write(report.to_bytes())
+        else:
+            self.serial.write(report.to_multi_bytes(controller_id))
+
+    def send_control(self, command: int, slot_id: int, payload: bytes = b"") -> None:
+        """Send a UART v3 control packet: announce, color, etc."""
+        payload = bytes(payload)
+        if len(payload) > 250:
+            raise ValueError("control payload is too large")
+        frame = bytes([UART_HEADER, UART_PROTOCOL_CONTROL, int(command) & 0xFF, int(slot_id) & 0xFF, len(payload)]) + payload
+        self.serial.write(frame + bytes([compute_checksum(frame)]))
+
+    def announce(self, slot_id: int, duration_ms: int = 120) -> None:
+        """Ask the Pico to pulse L+R on one virtual Switch slot."""
+        duration_ms = max(20, min(1000, int(duration_ms)))
+        self.send_control(UART_CONTROL_ANNOUNCE, slot_id, struct.pack("<H", duration_ms))
+
+    def set_color(self, slot_id: int, body_rgb: Tuple[int, int, int], buttons_rgb: Tuple[int, int, int]) -> None:
+        """Set runtime color for one virtual Switch slot."""
+        payload = bytes([clamp_byte(x) for x in (*body_rgb, *buttons_rgb)])
+        self.send_control(UART_CONTROL_SET_COLOR, slot_id, payload)
 
     def read_rumble_payload(self) -> Optional[bytes]:
         """

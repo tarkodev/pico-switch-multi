@@ -22,8 +22,13 @@ extern "C" {
 
 #define CFG_TUD_ENDPOINT0_SIZE 64
 
+#ifndef SWITCH_PICO_CONTROLLER_COUNT
+#define SWITCH_PICO_CONTROLLER_COUNT 8
+#endif
+// Patched by apply_multi8_patch.py for experimental multi-slot HID composite mode.
+
 // Device class configuration
-#define CFG_TUD_HID 1
+#define CFG_TUD_HID SWITCH_PICO_CONTROLLER_COUNT
 #define CFG_TUD_CDC 0
 #define CFG_TUD_MSC 0
 #define CFG_TUD_MIDI 0

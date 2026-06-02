@@ -55,6 +55,28 @@ void switch_pro_init();
 // Update the desired controller state for the next USB report.
 void switch_pro_set_input(const SwitchInputState& state);
 
+#ifndef SWITCH_PICO_CONTROLLER_COUNT
+#define SWITCH_PICO_CONTROLLER_COUNT 8
+#endif
+
+// Multi-HID experimental helpers. The original single-controller API still
+// maps to instance 0 for backwards compatibility.
+void switch_pro_set_input_for(uint8_t instance, const SwitchInputState& state);
+void switch_pro_task_for(uint8_t instance);
+bool switch_pro_is_ready_for(uint8_t instance);
+void switch_pro_set_color_for(uint8_t instance, uint8_t body_r, uint8_t body_g, uint8_t body_b, uint8_t button_r, uint8_t button_g, uint8_t button_b);
+
+#ifndef SWITCH_PICO_CONTROLLER_COUNT
+#define SWITCH_PICO_CONTROLLER_COUNT 8
+#endif
+
+// Multi-HID experimental helpers. The original single-controller API still
+// maps to instance 0 for backwards compatibility.
+void switch_pro_set_input_for(uint8_t instance, const SwitchInputState& state);
+void switch_pro_task_for(uint8_t instance);
+bool switch_pro_is_ready_for(uint8_t instance);
+void switch_pro_set_color_for(uint8_t instance, uint8_t body_r, uint8_t body_g, uint8_t body_b, uint8_t button_r, uint8_t button_g, uint8_t button_b);
+
 // Drive the Switch Pro USB state machine; call this frequently in the main loop.
 void switch_pro_task();
 

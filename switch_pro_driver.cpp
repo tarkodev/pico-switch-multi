@@ -17,32 +17,81 @@
 // force a report to be sent every X ms
 #define SWITCH_PRO_KEEPALIVE_TIMER 5
 
-static SwitchInputState g_input_state{
-    false, false, false, false,
-    false, false, false, false, false, false, false, false,
-    false, false, false, false, false, false,
-    SWITCH_PRO_JOYSTICK_MID, SWITCH_PRO_JOYSTICK_MID,
-    SWITCH_PRO_JOYSTICK_MID, SWITCH_PRO_JOYSTICK_MID};
+#ifndef SWITCH_PICO_CONTROLLER_COUNT
+#define SWITCH_PICO_CONTROLLER_COUNT 8
+#endif
 
-static uint8_t report_buffer[SWITCH_PRO_ENDPOINT_SIZE] = {};
-static uint8_t last_report[SWITCH_PRO_ENDPOINT_SIZE] = {};
-static SwitchProReport switch_report{};
-static uint8_t last_report_counter = 0;
-static uint32_t last_report_timer = 0;
-static uint32_t last_host_activity_ms = 0;
-static bool is_ready = false;
-static bool is_initialized = false;
-static bool is_report_queued = false;
-static bool report_sent = false;
-static uint8_t queued_report_id = 0;
-static bool forced_ready = false;
-static uint8_t handshake_counter = 0;
+static SwitchInputState make_initial_input_state() {
+    SwitchInputState s{};
+    s.lx = SWITCH_PRO_JOYSTICK_MID;
+    s.ly = SWITCH_PRO_JOYSTICK_MID;
+    s.rx = SWITCH_PRO_JOYSTICK_MID;
+    s.ry = SWITCH_PRO_JOYSTICK_MID;
+    return s;
+}
 
-static SwitchDeviceInfo device_info{};
-static uint8_t player_id = 0;
-static uint8_t input_mode = 0x30;
-static bool is_imu_enabled = false;
-static bool is_vibration_enabled = false;
+struct SwitchRuntimeColor {
+    bool valid = false;
+    SwitchColorDefinition body = {0x1B, 0x1B, 0x1D};
+    SwitchColorDefinition buttons = {0xFF, 0xFF, 0xFF};
+    SwitchColorDefinition left_grip = {0xEC, 0x00, 0x8C};
+    SwitchColorDefinition right_grip = {0xEC, 0x00, 0x8C};
+};
+
+struct SwitchProSlot {
+    SwitchInputState g_input_state = make_initial_input_state();
+    uint8_t report_buffer[SWITCH_PRO_ENDPOINT_SIZE] = {};
+    uint8_t last_report[SWITCH_PRO_ENDPOINT_SIZE] = {};
+    SwitchProReport switch_report{};
+    uint8_t last_report_counter = 0;
+    uint32_t last_report_timer = 0;
+    uint32_t last_host_activity_ms = 0;
+    bool is_ready = false;
+    bool is_initialized = false;
+    bool is_report_queued = false;
+    bool report_sent = false;
+    uint8_t queued_report_id = 0;
+    bool forced_ready = false;
+    uint8_t handshake_counter = 0;
+    SwitchDeviceInfo device_info{};
+    uint8_t player_id = 0;
+    uint8_t input_mode = 0x30;
+    bool is_imu_enabled = false;
+    bool is_vibration_enabled = false;
+    SwitchRuntimeColor runtime_color{};
+};
+
+static SwitchProSlot g_switch_slots[SWITCH_PICO_CONTROLLER_COUNT];
+static uint8_t g_active_hid_instance = 0;
+
+static bool switch_pro_select_instance(uint8_t instance) {
+    if (instance >= SWITCH_PICO_CONTROLLER_COUNT) {
+        return false;
+    }
+    g_active_hid_instance = instance;
+    return true;
+}
+
+#define g_input_state (g_switch_slots[g_active_hid_instance].g_input_state)
+#define report_buffer (g_switch_slots[g_active_hid_instance].report_buffer)
+#define last_report (g_switch_slots[g_active_hid_instance].last_report)
+#define switch_report (g_switch_slots[g_active_hid_instance].switch_report)
+#define last_report_counter (g_switch_slots[g_active_hid_instance].last_report_counter)
+#define last_report_timer (g_switch_slots[g_active_hid_instance].last_report_timer)
+#define last_host_activity_ms (g_switch_slots[g_active_hid_instance].last_host_activity_ms)
+#define is_ready (g_switch_slots[g_active_hid_instance].is_ready)
+#define is_initialized (g_switch_slots[g_active_hid_instance].is_initialized)
+#define is_report_queued (g_switch_slots[g_active_hid_instance].is_report_queued)
+#define report_sent (g_switch_slots[g_active_hid_instance].report_sent)
+#define queued_report_id (g_switch_slots[g_active_hid_instance].queued_report_id)
+#define forced_ready (g_switch_slots[g_active_hid_instance].forced_ready)
+#define handshake_counter (g_switch_slots[g_active_hid_instance].handshake_counter)
+#define device_info (g_switch_slots[g_active_hid_instance].device_info)
+#define player_id (g_switch_slots[g_active_hid_instance].player_id)
+#define input_mode (g_switch_slots[g_active_hid_instance].input_mode)
+#define is_imu_enabled (g_switch_slots[g_active_hid_instance].is_imu_enabled)
+#define is_vibration_enabled (g_switch_slots[g_active_hid_instance].is_vibration_enabled)
+#define runtime_color (g_switch_slots[g_active_hid_instance].runtime_color)
 
 // Optional compile-time colour override (body/buttons/grips).
 #if __has_include("controller_color_config.h")
@@ -232,7 +281,7 @@ static void send_identify() {
 }
 
 static bool send_report(uint8_t reportID, const void* reportData, uint16_t reportLength) {
-    bool result = tud_hid_report(reportID, reportData, reportLength);
+    bool result = tud_hid_n_report(g_active_hid_instance, reportID, reportData, reportLength);
     if (last_report_counter < 255) {
         last_report_counter++;
     } else {
@@ -244,17 +293,51 @@ static bool send_report(uint8_t reportID, const void* reportData, uint16_t repor
     return result;
 }
 
+
+static bool runtime_color_byte(uint32_t absolute_address, uint8_t* out) {
+    if (!runtime_color.valid || !out) {
+        return false;
+    }
+    switch (absolute_address) {
+        case 0x6050: *out = runtime_color.body.red; return true;
+        case 0x6051: *out = runtime_color.body.green; return true;
+        case 0x6052: *out = runtime_color.body.blue; return true;
+        case 0x6053: *out = runtime_color.buttons.red; return true;
+        case 0x6054: *out = runtime_color.buttons.green; return true;
+        case 0x6055: *out = runtime_color.buttons.blue; return true;
+        case 0x6056: *out = runtime_color.left_grip.red; return true;
+        case 0x6057: *out = runtime_color.left_grip.green; return true;
+        case 0x6058: *out = runtime_color.left_grip.blue; return true;
+        case 0x6059: *out = runtime_color.right_grip.red; return true;
+        case 0x605A: *out = runtime_color.right_grip.green; return true;
+        case 0x605B: *out = runtime_color.right_grip.blue; return true;
+        default: return false;
+    }
+}
+
+static void apply_runtime_color_overlay(uint8_t* dest, uint32_t address, uint8_t size) {
+    if (!dest || !runtime_color.valid) {
+        return;
+    }
+    for (uint8_t i = 0; i < size; ++i) {
+        uint8_t value = 0;
+        if (runtime_color_byte(address + i, &value)) {
+            dest[i] = value;
+        }
+    }
+}
+
 static void read_spi_flash(uint8_t* dest, uint32_t address, uint8_t size) {
     uint32_t addressBank = address & 0xFFFFFF00;
     uint32_t addressOffset = address & 0x000000FF;
     auto it = spi_flash_data.find(addressBank);
-
     if (it != spi_flash_data.end()) {
         const uint8_t* data = it->second;
         memcpy(dest, data + addressOffset, size);
     } else {
         memset(dest, 0xFF, size);
     }
+    apply_runtime_color_overlay(dest, address, size);
 }
 
 static void forward_rumble_to_host(const uint8_t* report, uint16_t length) {
@@ -516,7 +599,8 @@ static void update_switch_report_from_state() {
     switch_report.rumbleReport = 0x09;
 }
 
-void switch_pro_init() {
+static void switch_pro_init_one(uint8_t instance) {
+    if (!switch_pro_select_instance(instance)) return;
     player_id = 0;
     last_report_counter = 0;
     handshake_counter = 0;
@@ -593,11 +677,34 @@ void switch_pro_init() {
     factory_config->rightStickCalibration.getRealMax(rightMaxX, rightMaxY);
 }
 
-void switch_pro_set_input(const SwitchInputState& state) {
+void switch_pro_init() {
+    for (uint8_t i = 0; i < SWITCH_PICO_CONTROLLER_COUNT; ++i) {
+        switch_pro_init_one(i);
+    }
+}
+
+void switch_pro_set_input_for(uint8_t instance, const SwitchInputState& state) {
+    if (!switch_pro_select_instance(instance)) return;
     g_input_state = state;
 }
 
-void switch_pro_task() {
+void switch_pro_set_input(const SwitchInputState& state) {
+    switch_pro_set_input_for(0, state);
+}
+
+void switch_pro_set_color_for(uint8_t instance, uint8_t body_r, uint8_t body_g, uint8_t body_b, uint8_t button_r, uint8_t button_g, uint8_t button_b) {
+    if (!switch_pro_select_instance(instance)) return;
+    runtime_color.valid = true;
+    runtime_color.body = {body_r, body_g, body_b};
+    runtime_color.buttons = {button_r, button_g, button_b};
+    runtime_color.left_grip = {body_r, body_g, body_b};
+    runtime_color.right_grip = {body_r, body_g, body_b};
+    device_info.storedColors = 0x02;
+}
+
+
+static void switch_pro_task_one(uint8_t instance) {
+    if (!switch_pro_select_instance(instance)) return;
     uint32_t now = to_ms_since_boot(get_absolute_time());
     report_sent = false;
 
@@ -609,7 +716,7 @@ void switch_pro_task() {
 
     if (is_report_queued) {
         if ((now - last_report_timer) > SWITCH_PRO_KEEPALIVE_TIMER) {
-            if (tud_hid_ready() && send_report(queued_report_id, report_buffer, 64) == true ) {
+            if (tud_hid_n_ready(g_active_hid_instance) && send_report(queued_report_id, report_buffer, 64) == true ) {
                 is_report_queued = false;
                 last_report_timer = now;
             }
@@ -622,7 +729,7 @@ void switch_pro_task() {
             switch_report.timestamp = last_report_counter;
             void * inputReport = &switch_report;
             uint16_t report_size = sizeof(switch_report);
-            if (tud_hid_ready() && send_report(0, inputReport, report_size) == true ) {
+            if (tud_hid_n_ready(g_active_hid_instance) && send_report(0, inputReport, report_size) == true ) {
                 memcpy(last_report, inputReport, report_size);
                 g_input_state.imu_sample_count = 0;
                 report_sent = true;
@@ -633,13 +740,23 @@ void switch_pro_task() {
     } else {
         if (!is_initialized) {
             send_identify();
-            if (tud_hid_ready() && tud_hid_report(0, report_buffer, 64) == true) {
+            if (tud_hid_n_ready(g_active_hid_instance) && tud_hid_n_report(g_active_hid_instance, 0, report_buffer, 64) == true) {
                 is_initialized = true;
                 report_sent = true;
             }
 
             last_report_timer = now;
         }
+    }
+}
+
+void switch_pro_task_for(uint8_t instance) {
+    switch_pro_task_one(instance);
+}
+
+void switch_pro_task() {
+    for (uint8_t i = 0; i < SWITCH_PICO_CONTROLLER_COUNT; ++i) {
+        switch_pro_task_one(i);
     }
 }
 
@@ -753,13 +870,18 @@ void switch_pro_set_rumble_callback(SwitchRumbleCallback cb) {
     rumble_callback = cb;
 }
 
-bool switch_pro_is_ready() {
+bool switch_pro_is_ready_for(uint8_t instance) {
+    if (!switch_pro_select_instance(instance)) return false;
     return is_ready;
+}
+
+bool switch_pro_is_ready() {
+    return switch_pro_is_ready_for(0);
 }
 
 // HID callbacks
 uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t report_type, uint8_t *buffer, uint16_t reqlen) {
-    (void)instance;
+    if (!switch_pro_select_instance(instance)) return 0;
     LOG_PRINTF("[HID] get_report id=%u type=%u len=%u\n", report_id, report_type, reqlen);
     if (!buffer) return 0;
 
@@ -771,7 +893,7 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id, hid_report_t
 }
 
 void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t report_type, uint8_t const *buffer, uint16_t bufsize) {
-    (void)instance;
+    if (!switch_pro_select_instance(instance)) return;
     if (report_type != HID_REPORT_TYPE_OUTPUT) return;
 
     memset(report_buffer, 0x00, bufsize);
@@ -797,7 +919,7 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
 }
 
 void tud_hid_report_received_cb(uint8_t instance, uint8_t report_id, uint8_t const* buffer, uint16_t bufsize) {
-    (void)instance;
+    if (!switch_pro_select_instance(instance)) return;
     // Host sent data on interrupt OUT; mirror the control path handling.
     memset(report_buffer, 0x00, bufsize);
     uint8_t switchReportID = buffer[0];
@@ -841,17 +963,24 @@ bool tud_control_request_cb(uint8_t rhport, tusb_control_request_t const * reque
 
 void tud_mount_cb(void) {
     LOG_PRINTF("[USB] mount_cb\n");
-    last_host_activity_ms = to_ms_since_boot(get_absolute_time());
-    forced_ready = false;
-    is_ready = false;
-    is_initialized = false;
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+    for (uint8_t i = 0; i < SWITCH_PICO_CONTROLLER_COUNT; ++i) {
+        switch_pro_select_instance(i);
+        last_host_activity_ms = now;
+        forced_ready = false;
+        is_ready = false;
+        is_initialized = false;
+    }
 }
 
 void tud_umount_cb(void) {
     LOG_PRINTF("[USB] umount_cb\n");
-    forced_ready = false;
-    is_ready = false;
-    is_initialized = false;
+    for (uint8_t i = 0; i < SWITCH_PICO_CONTROLLER_COUNT; ++i) {
+        switch_pro_select_instance(i);
+        forced_ready = false;
+        is_ready = false;
+        is_initialized = false;
+    }
 }
 
 static uint16_t desc_str[32];

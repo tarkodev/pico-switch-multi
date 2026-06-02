@@ -2,9 +2,13 @@
 Switch-Fightstick
 GP2040-CE
 build
+build-ninja
 debug
+.venv
+run-logs
 .pycache
 *.egg-info
+*.multi8.bak
 hid-nintendo.c
 __pycache__
 !.vscode/*

@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-controller-uart-bridge = "switch_pico_bridge.controller_uart_bridge:main"
+controller-uart-bridge = "switch_pico_bridge.controller_uart_bridge_v2:main"
 host-uart-logger = "switch_pico_bridge.host_uart_logger:main"
 
 [tool.setuptools]

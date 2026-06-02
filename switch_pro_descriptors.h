@@ -365,50 +365,282 @@ static const uint8_t switch_pro_hid_descriptor[] =
     0xCB, 0x00,  // wDescriptorLength[0] 86
 };
 
-static const uint8_t switch_pro_configuration_descriptor[] =
-{
-    0x09,        // bLength
-    0x02,        // bDescriptorType (Configuration)
-    0x29, 0x00,  // wTotalLength 41
-    0x01,        // bNumInterfaces 1
-    0x01,        // bConfigurationValue
-    0x00,        // iConfiguration (String Index)
-    0xA0,        // bmAttributes Remote Wakeup
-    0xFA,        // bMaxPower 500mA
+static const uint8_t switch_pro_configuration_descriptor[] = {
+    0x09, // bLength
+    0x02, // bDescriptorType (Configuration)
+    0x09, 0x01, // wTotalLength
+    0x08, // bNumInterfaces
+    0x01, // bConfigurationValue
+    0x00, // iConfiguration (String Index)
+    0xA0, // bmAttributes Remote Wakeup
+    0xFA, // bMaxPower 500mA
 
-    0x09,        // bLength
-    0x04,        // bDescriptorType (Interface)
-    0x00,        // bInterfaceNumber 0
-    0x00,        // bAlternateSetting
-    0x02,        // bNumEndpoints 2
-    0x03,        // bInterfaceClass
-    0x00,        // bInterfaceSubClass
-    0x00,        // bInterfaceProtocol
-    0x00,        // iInterface (String Index)
+    // HID interface 0 - Switch Pro Controller virtual slot 0
+    0x09, // bLength
+    0x04, // bDescriptorType (Interface)
+    0x00, // bInterfaceNumber
+    0x00, // bAlternateSetting
+    0x02, // bNumEndpoints
+    0x03, // bInterfaceClass (HID)
+    0x00, // bInterfaceSubClass
+    0x00, // bInterfaceProtocol
+    0x00, // iInterface (String Index)
 
-    0x09,        // bLength
-    0x21,        // bDescriptorType (HID)
-    0x11, 0x01,  // bcdHID 1.11
-    0x00,        // bCountryCode
-    0x01,        // bNumDescriptors
-    0x22,        // bDescriptorType[0] (HID)
-    0xCB, 0x00,  // wDescriptorLength[0] 203
+    0x09, // bLength
+    0x21, // bDescriptorType (HID)
+    0x11, 0x01, // bcdHID 1.11
+    0x00, // bCountryCode
+    0x01, // bNumDescriptors
+    0x22, // bDescriptorType[0] (Report)
+    0xCB, 0x00, // wDescriptorLength[0] 203
 
-    0x07,        // bLength
-    0x05,        // bDescriptorType (Endpoint)
-    0x81,        // bEndpointAddress (IN/D2H)
-    0x03,        // bmAttributes (Interrupt)
-    0x40, 0x00,  // wMaxPacketSize 64
-    0x08,        // bInterval 8 (unit depends on device speed)
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x81, // bEndpointAddress (IN/D2H)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
 
-    0x07,        // bLength
-    0x05,        // bDescriptorType (Endpoint)
-    0x01,        // bEndpointAddress (OUT/H2D)
-    0x03,        // bmAttributes (Interrupt)
-    0x40, 0x00,  // wMaxPacketSize 64
-    0x08,        // bInterval 8 (unit depends on device speed)
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x01, // bEndpointAddress (OUT/H2D)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    // HID interface 1 - Switch Pro Controller virtual slot 1
+    0x09, // bLength
+    0x04, // bDescriptorType (Interface)
+    0x01, // bInterfaceNumber
+    0x00, // bAlternateSetting
+    0x02, // bNumEndpoints
+    0x03, // bInterfaceClass (HID)
+    0x00, // bInterfaceSubClass
+    0x00, // bInterfaceProtocol
+    0x00, // iInterface (String Index)
+
+    0x09, // bLength
+    0x21, // bDescriptorType (HID)
+    0x11, 0x01, // bcdHID 1.11
+    0x00, // bCountryCode
+    0x01, // bNumDescriptors
+    0x22, // bDescriptorType[0] (Report)
+    0xCB, 0x00, // wDescriptorLength[0] 203
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x82, // bEndpointAddress (IN/D2H)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x02, // bEndpointAddress (OUT/H2D)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    // HID interface 2 - Switch Pro Controller virtual slot 2
+    0x09, // bLength
+    0x04, // bDescriptorType (Interface)
+    0x02, // bInterfaceNumber
+    0x00, // bAlternateSetting
+    0x02, // bNumEndpoints
+    0x03, // bInterfaceClass (HID)
+    0x00, // bInterfaceSubClass
+    0x00, // bInterfaceProtocol
+    0x00, // iInterface (String Index)
+
+    0x09, // bLength
+    0x21, // bDescriptorType (HID)
+    0x11, 0x01, // bcdHID 1.11
+    0x00, // bCountryCode
+    0x01, // bNumDescriptors
+    0x22, // bDescriptorType[0] (Report)
+    0xCB, 0x00, // wDescriptorLength[0] 203
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x83, // bEndpointAddress (IN/D2H)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x03, // bEndpointAddress (OUT/H2D)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    // HID interface 3 - Switch Pro Controller virtual slot 3
+    0x09, // bLength
+    0x04, // bDescriptorType (Interface)
+    0x03, // bInterfaceNumber
+    0x00, // bAlternateSetting
+    0x02, // bNumEndpoints
+    0x03, // bInterfaceClass (HID)
+    0x00, // bInterfaceSubClass
+    0x00, // bInterfaceProtocol
+    0x00, // iInterface (String Index)
+
+    0x09, // bLength
+    0x21, // bDescriptorType (HID)
+    0x11, 0x01, // bcdHID 1.11
+    0x00, // bCountryCode
+    0x01, // bNumDescriptors
+    0x22, // bDescriptorType[0] (Report)
+    0xCB, 0x00, // wDescriptorLength[0] 203
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x84, // bEndpointAddress (IN/D2H)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x04, // bEndpointAddress (OUT/H2D)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    // HID interface 4 - Switch Pro Controller virtual slot 4
+    0x09, // bLength
+    0x04, // bDescriptorType (Interface)
+    0x04, // bInterfaceNumber
+    0x00, // bAlternateSetting
+    0x02, // bNumEndpoints
+    0x03, // bInterfaceClass (HID)
+    0x00, // bInterfaceSubClass
+    0x00, // bInterfaceProtocol
+    0x00, // iInterface (String Index)
+
+    0x09, // bLength
+    0x21, // bDescriptorType (HID)
+    0x11, 0x01, // bcdHID 1.11
+    0x00, // bCountryCode
+    0x01, // bNumDescriptors
+    0x22, // bDescriptorType[0] (Report)
+    0xCB, 0x00, // wDescriptorLength[0] 203
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x85, // bEndpointAddress (IN/D2H)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x05, // bEndpointAddress (OUT/H2D)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    // HID interface 5 - Switch Pro Controller virtual slot 5
+    0x09, // bLength
+    0x04, // bDescriptorType (Interface)
+    0x05, // bInterfaceNumber
+    0x00, // bAlternateSetting
+    0x02, // bNumEndpoints
+    0x03, // bInterfaceClass (HID)
+    0x00, // bInterfaceSubClass
+    0x00, // bInterfaceProtocol
+    0x00, // iInterface (String Index)
+
+    0x09, // bLength
+    0x21, // bDescriptorType (HID)
+    0x11, 0x01, // bcdHID 1.11
+    0x00, // bCountryCode
+    0x01, // bNumDescriptors
+    0x22, // bDescriptorType[0] (Report)
+    0xCB, 0x00, // wDescriptorLength[0] 203
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x86, // bEndpointAddress (IN/D2H)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x06, // bEndpointAddress (OUT/H2D)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    // HID interface 6 - Switch Pro Controller virtual slot 6
+    0x09, // bLength
+    0x04, // bDescriptorType (Interface)
+    0x06, // bInterfaceNumber
+    0x00, // bAlternateSetting
+    0x02, // bNumEndpoints
+    0x03, // bInterfaceClass (HID)
+    0x00, // bInterfaceSubClass
+    0x00, // bInterfaceProtocol
+    0x00, // iInterface (String Index)
+
+    0x09, // bLength
+    0x21, // bDescriptorType (HID)
+    0x11, 0x01, // bcdHID 1.11
+    0x00, // bCountryCode
+    0x01, // bNumDescriptors
+    0x22, // bDescriptorType[0] (Report)
+    0xCB, 0x00, // wDescriptorLength[0] 203
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x87, // bEndpointAddress (IN/D2H)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x07, // bEndpointAddress (OUT/H2D)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    // HID interface 7 - Switch Pro Controller virtual slot 7
+    0x09, // bLength
+    0x04, // bDescriptorType (Interface)
+    0x07, // bInterfaceNumber
+    0x00, // bAlternateSetting
+    0x02, // bNumEndpoints
+    0x03, // bInterfaceClass (HID)
+    0x00, // bInterfaceSubClass
+    0x00, // bInterfaceProtocol
+    0x00, // iInterface (String Index)
+
+    0x09, // bLength
+    0x21, // bDescriptorType (HID)
+    0x11, 0x01, // bcdHID 1.11
+    0x00, // bCountryCode
+    0x01, // bNumDescriptors
+    0x22, // bDescriptorType[0] (Report)
+    0xCB, 0x00, // wDescriptorLength[0] 203
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x88, // bEndpointAddress (IN/D2H)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
+
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x08, // bEndpointAddress (OUT/H2D)
+    0x03, // bmAttributes (Interrupt)
+    0x40, 0x00, // wMaxPacketSize 64
+    0x08, // bInterval 8
 };
 
+// Patched by apply_multi8_patch.py for experimental multi-slot HID composite mode.
 static const uint8_t switch_pro_report_descriptor[] =
 {
     0x05, 0x01,        // Usage Page (Generic Desktop Ctrls)
