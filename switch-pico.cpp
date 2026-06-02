@@ -28,6 +28,7 @@
 #define USB_COLOR_RECONNECT_DELAY_MS 250u
 #define ANNOUNCE_DELAY_MS 1000u
 #define ANNOUNCE_PULSE_MS 100u
+#define ANNOUNCE_SLOT_GAP_MS 1000u
 #ifndef SWITCH_PICO_CONTROLLER_COUNT
 #define SWITCH_PICO_CONTROLLER_COUNT 8
 #endif
@@ -43,6 +44,7 @@ static uint16_t g_pending_announce_ms[SWITCH_PICO_CONTROLLER_COUNT] = {};
 // Track the latest state provided by UART or the autopilot.
 static SwitchInputState g_user_state[SWITCH_PICO_CONTROLLER_COUNT];
 static bool g_auto_announce_on_mount[SWITCH_PICO_CONTROLLER_COUNT] = {};
+static bool g_slot_inputs_unlocked[SWITCH_PICO_CONTROLLER_COUNT] = {};
 static uint32_t g_announce_started_at_ms[SWITCH_PICO_CONTROLLER_COUNT] = {};
 static uint32_t g_announce_until_ms[SWITCH_PICO_CONTROLLER_COUNT] = {};
 
@@ -50,8 +52,10 @@ static void schedule_announce_for(uint8_t slot_id, uint32_t base_ms) {
     if (slot_id >= SWITCH_PICO_CONTROLLER_COUNT) {
         return;
     }
-    g_announce_started_at_ms[slot_id] = base_ms + ANNOUNCE_DELAY_MS;
-    g_announce_until_ms[slot_id] = base_ms + ANNOUNCE_DELAY_MS + ANNOUNCE_PULSE_MS;
+    g_slot_inputs_unlocked[slot_id] = false;
+    uint32_t start_ms = base_ms + ANNOUNCE_DELAY_MS + (static_cast<uint32_t>(slot_id) * ANNOUNCE_SLOT_GAP_MS);
+    g_announce_started_at_ms[slot_id] = start_ms;
+    g_announce_until_ms[slot_id] = start_ms + ANNOUNCE_PULSE_MS;
     g_pending_announce_ms[slot_id] = 0;
 }
 
@@ -143,6 +147,7 @@ static void update_usb_bridge_connection() {
         for (uint8_t i = 0; i < SWITCH_PICO_CONTROLLER_COUNT; ++i) {
             g_user_state[i] = neutral_input();
             g_auto_announce_on_mount[i] = false;
+            g_slot_inputs_unlocked[i] = false;
             g_announce_started_at_ms[i] = 0;
             g_announce_until_ms[i] = 0;
             g_pending_announce_ms[i] = 0;
@@ -398,6 +403,10 @@ int main() {
             } else if (g_announce_until_ms[i] != 0 && loop_now_ms >= g_announce_until_ms[i]) {
                 g_announce_started_at_ms[i] = 0;
                 g_announce_until_ms[i] = 0;
+                g_slot_inputs_unlocked[i] = true;
+            }
+            if (g_auto_announce_on_mount[i] && !g_slot_inputs_unlocked[i]) {
+                state = neutral_input();
             }
             switch_pro_set_input_for(i, state);
         }
