@@ -42,8 +42,18 @@ static uint16_t g_pending_announce_ms[SWITCH_PICO_CONTROLLER_COUNT] = {};
 
 // Track the latest state provided by UART or the autopilot.
 static SwitchInputState g_user_state[SWITCH_PICO_CONTROLLER_COUNT];
+static bool g_auto_announce_on_mount[SWITCH_PICO_CONTROLLER_COUNT] = {};
 static uint32_t g_announce_started_at_ms[SWITCH_PICO_CONTROLLER_COUNT] = {};
 static uint32_t g_announce_until_ms[SWITCH_PICO_CONTROLLER_COUNT] = {};
+
+static void schedule_announce_for(uint8_t slot_id, uint32_t base_ms) {
+    if (slot_id >= SWITCH_PICO_CONTROLLER_COUNT) {
+        return;
+    }
+    g_announce_started_at_ms[slot_id] = base_ms + ANNOUNCE_DELAY_MS;
+    g_announce_until_ms[slot_id] = base_ms + ANNOUNCE_DELAY_MS + ANNOUNCE_PULSE_MS;
+    g_pending_announce_ms[slot_id] = 0;
+}
 
 static void init_uart_input() {
     uart_init(UART_ID, BAUD_RATE);
@@ -132,6 +142,7 @@ static void update_usb_bridge_connection() {
         g_usb_reconnect_at_ms = 0;
         for (uint8_t i = 0; i < SWITCH_PICO_CONTROLLER_COUNT; ++i) {
             g_user_state[i] = neutral_input();
+            g_auto_announce_on_mount[i] = false;
             g_announce_started_at_ms[i] = 0;
             g_announce_until_ms[i] = 0;
             g_pending_announce_ms[i] = 0;
@@ -216,10 +227,9 @@ static bool handle_uart_control_packet(const uint8_t* packet, uint8_t length) {
             }
             if (duration_ms < 20) duration_ms = 20;
             if (duration_ms > 1000) duration_ms = 1000;
+            g_auto_announce_on_mount[slot_id] = true;
             if (tud_mounted()) {
-                uint32_t start_ms = now_ms();
-                g_announce_started_at_ms[slot_id] = start_ms + ANNOUNCE_DELAY_MS;
-                g_announce_until_ms[slot_id] = start_ms + ANNOUNCE_DELAY_MS + ANNOUNCE_PULSE_MS;
+                schedule_announce_for(slot_id, now_ms());
             } else {
                 g_pending_announce_ms[slot_id] = duration_ms;
             }
@@ -329,6 +339,15 @@ static void log_usb_state() {
     if (mounted != g_last_mounted) {
         g_last_mounted = mounted;
         LOG_PRINTF("[USB] %s\n", mounted ? "mounted" : "unmounted");
+        if (mounted) {
+            uint32_t current_ms = now_ms();
+            for (uint8_t i = 0; i < SWITCH_PICO_CONTROLLER_COUNT; ++i) {
+                if (g_auto_announce_on_mount[i]) {
+                    schedule_announce_for(i, current_ms);
+                    LOG_PRINTF("[UART] announce rearmed slot=%u\n", i);
+                }
+            }
+        }
     }
 
     for (uint8_t i = 0; i < SWITCH_PICO_CONTROLLER_COUNT; ++i) {
@@ -368,9 +387,7 @@ int main() {
         for (uint8_t i = 0; i < SWITCH_PICO_CONTROLLER_COUNT; ++i) {
             SwitchInputState state = g_user_state[i];
             if (g_pending_announce_ms[i] != 0 && tud_mounted()) {
-                g_announce_started_at_ms[i] = loop_now_ms + ANNOUNCE_DELAY_MS;
-                g_announce_until_ms[i] = loop_now_ms + ANNOUNCE_DELAY_MS + ANNOUNCE_PULSE_MS;
-                g_pending_announce_ms[i] = 0;
+                schedule_announce_for(i, loop_now_ms);
                 LOG_PRINTF("[UART] announce armed slot=%u\n", i);
             }
             if (g_announce_until_ms[i] != 0 && loop_now_ms < g_announce_until_ms[i]) {

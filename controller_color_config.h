@@ -10,7 +10,7 @@
 #define SWITCH_COLOR_BODY_B 0x00
 
 // Face/button cluster colour
-#define SWITCH_COLOR_BUTTON_R 0x30
+#define SWITCH_COLOR_BUTTON_R 0xFF
 #define SWITCH_COLOR_BUTTON_G 0x00
 #define SWITCH_COLOR_BUTTON_B 0x00
 
